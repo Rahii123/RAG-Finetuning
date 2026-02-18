@@ -1,60 +1,135 @@
 import os
 import json
-from tqdm import tqdm
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
+text_splitter = RecursiveCharacterTextSplitter(chunk_size=100, chunk_overlap=0)
 
-def clean_text(text):
+# =====================================================
+# 1️⃣ METADATA RULES (Keyword Based – Production Safe)
+# =====================================================
+
+def get_metadata(document_id: str):
     """
-    Basic cleaning for extracted PDF text.
+    Robust metadata matcher based on keyword detection.
+    Avoids exact string dependency.
     """
-    text = text.replace("\n", " ")
-    text = text.replace("\t", " ")
-    text = " ".join(text.split())
-    return text
+
+    clean_id = document_id.replace("\u00a0", " ").strip().lower()
+
+    # -------- Immunization --------
+    if "immunization" in clean_id or "vaccine" in clean_id:
+        return {
+            "year": "2025",
+            "disease_type": "immunization"
+        }
+
+    # -------- Hypertension --------
+    if "hypertension" in clean_id:
+        return {
+            "year": "2013",
+            "disease_type": "hypertension"
+        }
+
+    # -------- Diabetes --------
+    if "diabetes" in clean_id or "t2dm" in clean_id:
+        return {
+            "year": "2024",
+            "disease_type": "diabetes"
+        }
+
+    # -------- Arthritis --------
+    if "arthritis" in clean_id:
+        return {
+            "year": "2023",
+            "disease_type": "bacterial_arthritis"
+        }
+
+    # -------- Pneumonia --------
+    if "pneumonia" in clean_id:
+        return {
+            "year": "2003",
+            "disease_type": "pneumonia"
+        }
+
+    # -------- rr6007 --------
+    if "rr6007" in clean_id:
+        return {
+            "year": "2011",
+            "disease_type": "immunization"
+        }
+
+    # -------- Default --------
+    return {
+        "year": "unknown",
+        "disease_type": "general_guideline"
+    }
 
 
-def split_documents(input_folder, output_folder,
-                    chunk_size=800,
-                    chunk_overlap=100):
-    """
-    Load JSON documents, clean text,
-    split into chunks, and save chunked output.
-    """
-    os.makedirs(output_folder, exist_ok=True)
+# =====================================================
+# 2️⃣ PATHS
+# =====================================================
 
-    splitter = RecursiveCharacterTextSplitter(
-        chunk_size=chunk_size,
-        chunk_overlap=chunk_overlap
-    )
+INPUT_FOLDER = "data/processed"
+OUTPUT_FOLDER = "data/chunks"
 
-    for file in tqdm(os.listdir(input_folder)):
-        if file.endswith(".json"):
-            file_path = os.path.join(input_folder, file)
+os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
-            with open(file_path, "r", encoding="utf-8") as f:
-                data = json.load(f)
+# =====================================================
+# 3️⃣ TEXT SPLITTER
+# =====================================================
 
-            cleaned_text = clean_text(data["content"])
-            chunks = splitter.split_text(cleaned_text)
+text_splitter = RecursiveCharacterTextSplitter(
+    chunk_size=800,
+    chunk_overlap=100
+)
 
-            chunked_data = []
+# =====================================================
+# 4️⃣ PROCESS FILES
+# =====================================================
 
-            for i, chunk in enumerate(chunks):
-                chunked_data.append({
-                    "document_id": data["document_id"],
-                    "chunk_id": f"{data['document_id']}_chunk_{i}",
-                    "content": chunk
-                })
+for filename in os.listdir(INPUT_FOLDER):
 
-            output_path = os.path.join(output_folder, file)
-            with open(output_path, "w", encoding="utf-8") as f:
-                json.dump(chunked_data, f, ensure_ascii=False, indent=2)
+    if filename.endswith(".json"):
 
-    print("All documents split into chunks.")
+        file_path = os.path.join(INPUT_FOLDER, filename)
 
+        with open(file_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
 
-if __name__ == "__main__":
-    input_folder = "../data/processed"
-    output_folder = "../data/chunked"
-    split_documents(input_folder, output_folder)
+        document_id = data.get("document_id", "unknown_id")
+        content = data.get("content", "")
+
+        print(f"Processing: {document_id}")
+
+        # 🔥 Robust metadata detection
+        metadata_info = get_metadata(document_id)
+
+        # Split text
+        chunks = text_splitter.split_text(content)
+
+        output_chunks = []
+
+        for i, chunk in enumerate(chunks):
+            output_chunks.append({
+                "chunk_id": f"{document_id}_chunk_{i}",
+                "document_id": document_id,
+                "text": chunk,
+                "metadata": {
+                    "year": metadata_info["year"],
+                    "disease_type": metadata_info["disease_type"],
+                    "source": data.get("source", "clinical_guideline")
+                }
+            })
+
+        # Save output
+        output_file = os.path.join(
+            OUTPUT_FOLDER,
+            f"{filename.replace('.json', '')}_chunks.json"
+        )
+
+        with open(output_file, "w", encoding="utf-8") as f:
+            json.dump(output_chunks, f, indent=4)
+
+        print(f"✅ Saved {len(output_chunks)} chunks\n")
+
+print("🎯 All documents processed successfully.")

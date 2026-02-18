@@ -57,6 +57,128 @@ def get_metadata(document_id: str):
             "year": "2011",
             "disease_type": "immunization"
         }
+        # -------- dsa700 --------
+    if "dsa700" in clean_id:
+        return {
+            "year": "2020",
+            "disease_type": "hypertension"
+        }
+
+    # -------- Hand Hygiene --------
+    if "hand-hygiene" in clean_id or "hand hygiene" in clean_id:
+        return {
+            "year": "2020",
+            "disease_type": "infection_control"
+        }
+
+    # -------- COVID Antigen Testing --------
+    if "covid" in clean_id and "antigen" in clean_id:
+        return {
+            "year": "2023",
+            "disease_type": "covid19"
+        }
+        # -------- dsa700 --------
+    if "dsa700" in clean_id:
+        return {
+            "year": "2020",
+            "disease_type": "hypertension"
+        }
+
+    # -------- Hand Hygiene --------
+    if "hand-hygiene" in clean_id or "hand hygiene" in clean_id:
+        return {
+            "year": "2020",
+            "disease_type": "infection_control"
+        }
+
+    # -------- COVID Antigen Testing --------
+    if "covid" in clean_id and "antigen" in clean_id:
+        return {
+            "year": "2023",
+            "disease_type": "covid19"
+        }
+    # -------- dsa700 --------
+    if "dsa700" in clean_id:
+        return {
+            "year": "2020",
+            "disease_type": "hypertension"
+        }
+
+    # -------- Hand Hygiene --------
+    if "hand-hygiene" in clean_id or "hand hygiene" in clean_id:
+        return {
+            "year": "2020",
+            "disease_type": "infection_control"
+        }
+
+    # -------- COVID Antigen Testing --------
+    if "covid" in clean_id and "antigen" in clean_id:
+        return {
+            "year": "2023",
+            "disease_type": "covid19"
+        }
+    # -------- dsa700 --------
+    if "dsa700" in clean_id:
+        return {
+            "year": "2020",
+            "disease_type": "hypertension"
+        }
+
+    # -------- Hand Hygiene --------
+    if "hand-hygiene" in clean_id or "hand hygiene" in clean_id:
+        return {
+            "year": "2020",
+            "disease_type": "infection_control"
+        }
+
+    # -------- COVID Antigen Testing --------
+    if "covid" in clean_id and "antigen" in clean_id:
+        return {
+            "year": "2023",
+            "disease_type": "covid19"
+        }
+    
+
+        # -------- dsa700 --------
+    if "dsa700" in clean_id:
+        return {
+            "year": "2020",
+            "disease_type": "hypertension"
+        }
+
+    # -------- Hand Hygiene --------
+    if "hand-hygiene" in clean_id or "hand hygiene" in clean_id:
+        return {
+            "year": "2020",
+            "disease_type": "infection_control"
+        }
+
+    # -------- COVID Antigen Testing --------
+    if "covid" in clean_id and "antigen" in clean_id:
+        return {
+            "year": "2023",
+            "disease_type": "covid19"
+        }
+ # -------- dsa700 --------
+    if "dsa700" in clean_id:
+        return {
+            "year": "2020",
+            "disease_type": "hypertension"
+        }
+
+    # -------- Hand Hygiene --------
+    if "hand-hygiene" in clean_id or "hand hygiene" in clean_id:
+        return {
+            "year": "2020",
+            "disease_type": "infection_control"
+        }
+
+    # -------- COVID Antigen Testing --------
+    if "covid" in clean_id and "antigen" in clean_id:
+        return {
+            "year": "2023",
+            "disease_type": "covid19"
+        }
 
     # -------- Default --------
     return {

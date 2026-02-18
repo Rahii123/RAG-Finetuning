@@ -1,0 +1,7 @@
+pymupdf
+tqdm
+langchain
+sentence-transformers
+faiss-cpu
+chromadb
+python-dotenv

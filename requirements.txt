@@ -6,3 +6,5 @@ faiss-cpu
 chromadb
 python-dotenv
 langchain-text-splitters
+chroma-migrate
+duckdb 

@@ -8,3 +8,4 @@ python-dotenv
 langchain-text-splitters
 chroma-migrate
 duckdb 
+groq

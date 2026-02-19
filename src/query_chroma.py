@@ -1,17 +1,24 @@
 import chromadb
-from chromadb.config import Settings
+from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
 
-PERSIST_DIRECTORY = "vector_store"
+# ==========================================
+# CHROMA SETUP
+# ==========================================
 
-client = chromadb.Client(
-    Settings(
-        chroma_db_impl="duckdb+parquet",
-        persist_directory=PERSIST_DIRECTORY,
-        anonymized_telemetry=False
-    )
+client = chromadb.HttpClient(host='localhost', port=8000)
+
+embedding_function = SentenceTransformerEmbeddingFunction(
+    model_name="all-MiniLM-L6-v2"
 )
 
-collection = client.get_collection(name="clinical_guidelines")
+collection = client.get_collection(
+    name="clinical_guidelines",
+    embedding_function=embedding_function
+)
+
+# ==========================================
+# QUERY
+# ==========================================
 
 query = input("Enter your question: ")
 

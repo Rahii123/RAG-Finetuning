@@ -1,0 +1,16 @@
+# List of currently supported/recommended Groq models (as of Feb 2026)
+# Source: https://console.groq.com/docs/deprecations
+
+# ✅ ACTIVE - General Purpose LLMs
+# - llama-3.3-70b-versatile          ← Best for complex tasks (replaces llama-3.1-70b-versatile)
+# - meta-llama/llama-4-scout-17b-16e-instruct  ← Multimodal, fast
+# - meta-llama/llama-4-maverick-17b-128e-instruct ← Multimodal, high quality
+
+# ❌ DECOMMISSIONED - DO NOT USE
+# - llama-3.1-70b-versatile          → Decommissioned Jan 24, 2025 → use llama-3.3-70b-versatile
+# - llama-3.1-8b-instant             → Decommissioned Apr 14, 2025 → use meta-llama/llama-4-scout-17b-16e-instruct
+# - mixtral-8x7b-32768               → Decommissioned Mar 20, 2025 → use llama-3.3-70b-versatile
+# - llama2-70b-4096                  → Decommissioned
+# - gemma-7b-it                      → Decommissioned Dec 18, 2024
+
+# (Always check https://console.groq.com/docs/models for the latest list)

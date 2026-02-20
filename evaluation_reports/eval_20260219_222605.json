@@ -1,0 +1,140 @@
+{
+  "timestamp": "20260219_222605",
+  "model": "llama-3.3-70b-versatile",
+  "embedding_model": "BAAI/bge-base-en-v1.5",
+  "n_tests": 8,
+  "avg_retrieval_precision": 0.963,
+  "avg_keyword_recall": 0.777,
+  "avg_llm_relevance": 4.875,
+  "answers_with_citations": 8,
+  "structured_answers": 8,
+  "hallucination_flags": 0,
+  "results": [
+    {
+      "test_id": "HTN-01",
+      "question": "Define hypertension and its classification by blood pressure levels.",
+      "chunks_retrieved": 10,
+      "retrieval_precision": 1.0,
+      "keyword_recall": 0.8,
+      "missing_keywords": [
+        "stage I"
+      ],
+      "llm_relevance_score": 5,
+      "has_citations": true,
+      "is_structured": true,
+      "hallucination_flag": false,
+      "judge_reasoning": "The answer provides a clear, structured, and well-cited definition and classification of hypertension, adhering to established medical guidelines.",
+      "generated_answer": "**1. Definition**\nHypertension is defined as persistent elevation of systolic BP of 140 mmHg or greater and/or diastolic BP of 90 mmHg or greater. (Source: Malaysian CPG Hypertension 2013, 2013)\n\n**2. Diagnostic Criteria**\nThe definition of hypertension is based on the average of two or more properly measured, seated, BP readings on each of two or more clinic visits. When SBP and DBP fall into different categories, the higher category should be selected to classify the individual’s BP. (Source: …"
+    },
+    {
+      "test_id": "HTN-02",
+      "question": "What are the diagnostic criteria and follow-up recommendations for hypertension?",
+      "chunks_retrieved": 10,
+      "retrieval_precision": 1.0,
+      "keyword_recall": 0.2,
+      "missing_keywords": [
+        "confirm",
+        "two or more",
+        "clinic visits",
+        "two months"
+      ],
+      "llm_relevance_score": 4,
+      "has_citations": true,
+      "is_structured": true,
+      "hallucination_flag": false,
+      "judge_reasoning": "The answer provides relevant and structured information on diagnostic criteria and follow-up recommendations for hypertension, with citations from established guidelines, but lacks completeness in some sections.",
+      "generated_answer": "**1. Definition**\nNot specified in retrieved guidelines. (Source: Malaysian CPG Hypertension 2013, 2013)\n\n**2. Diagnostic Criteria**\nThe diagnostic criteria for hypertension include blood pressure measurements, with the following categories: Stage I Hypertension (≥140/90 mmHg), Stage II Hypertension (≥160/100 mmHg), and Severe Hypertension (SBP ≥180 or DBP ≥110). (Source: Malaysian CPG Hypertension 2013, 2013)\n\n**3. Classification**\nThe classification of hypertension is based on blood pressure l…"
+    },
+    {
+      "test_id": "HTN-03",
+      "question": "What is the target blood pressure for diabetic patients with hypertension?",
+      "chunks_retrieved": 10,
+      "retrieval_precision": 1.0,
+      "keyword_recall": 1.0,
+      "missing_keywords": [],
+      "llm_relevance_score": 5,
+      "has_citations": true,
+      "is_structured": true,
+      "hallucination_flag": false,
+      "judge_reasoning": "The answer provides a well-structured and cited response that directly addresses the question about target blood pressure for diabetic patients with hypertension.",
+      "generated_answer": "**1. Definition**\nThe definition of target blood pressure for diabetic patients with hypertension is not explicitly defined in the provided extracts, but it can be inferred that the target blood pressure is a crucial aspect of managing hypertension in diabetic patients. (Source: Malaysian CPG Hypertension 2013, 2013)\n\n**2. Diagnostic Criteria**\nThe diagnostic criteria for hypertension in diabetic patients involve measuring blood pressure, with a threshold for initiation of treatment at systolic …"
+    },
+    {
+      "test_id": "HTN-04",
+      "question": "Describe the management of severe hypertension and hypertensive emergencies.",
+      "chunks_retrieved": 10,
+      "retrieval_precision": 1.0,
+      "keyword_recall": 0.667,
+      "missing_keywords": [
+        "labetalol",
+        "nitroprusside"
+      ],
+      "llm_relevance_score": 5,
+      "has_citations": true,
+      "is_structured": true,
+      "hallucination_flag": false,
+      "judge_reasoning": "The answer provides a comprehensive and well-structured overview of managing severe hypertension and hypertensive emergencies, with clear citations from established guidelines.",
+      "generated_answer": "**1. Definition** \nSevere hypertension is defined as persistent elevated SBP >180 mmHg and/or DBP >110 mmHg. (Source: Malaysian CPG Hypertension 2013, 2013)\n\n**2. Diagnostic Criteria** \nThe evaluation of patients with severe hypertension should include a thorough history and physical examination, particularly looking for signs of acute target organ damage/complication and causes of secondary hypertension. (Source: Malaysian CPG Hypertension 2013, 2013)\n\n**3. Classification** \nPatients with sever…"
+    },
+    {
+      "test_id": "DM-01",
+      "question": "Define type 2 diabetes mellitus and its diagnostic criteria.",
+      "chunks_retrieved": 10,
+      "retrieval_precision": 0.7,
+      "keyword_recall": 1.0,
+      "missing_keywords": [],
+      "llm_relevance_score": 5,
+      "has_citations": true,
+      "is_structured": true,
+      "hallucination_flag": false,
+      "judge_reasoning": "The answer provides a clear and structured definition of type 2 diabetes mellitus and its diagnostic criteria, with citations from relevant guidelines.",
+      "generated_answer": "**1. Definition**\nType 2 diabetes mellitus is a metabolic disorder of multiple etiology, characterized by chronic hyperglycaemia with disturbances of carbohydrate, fat and protein metabolism resulting from defects in insulin secretion, insulin action, or both. (Source: DSA700 Hypertension Guideline 2020, 2020)\n\n**2. Diagnostic Criteria**\nThe diagnosis of type 2 diabetes mellitus can be made based on a single abnormal result (either plasma glucose or HbA1c) in symptomatic individuals, while in as…"
+    },
+    {
+      "test_id": "DM-02",
+      "question": "What is the first-line pharmacological treatment for type 2 diabetes?",
+      "chunks_retrieved": 10,
+      "retrieval_precision": 1.0,
+      "keyword_recall": 0.75,
+      "missing_keywords": [
+        "glucose"
+      ],
+      "llm_relevance_score": 5,
+      "has_citations": true,
+      "is_structured": true,
+      "hallucination_flag": false,
+      "judge_reasoning": "The answer provides a clear and structured response with relevant information and citations from a specific guideline, directly addressing the question about first-line pharmacological treatment for type 2 diabetes.",
+      "generated_answer": "**1. Definition** \nNot specified in retrieved guidelines. (Source: Malaysian CPG Type 2 Diabetes 2020, 2020)\n\n**2. Diagnostic Criteria** \nDiagnosis of T2DM is based on HbA1c <6.5% and FPG <6.0 mmol/L. (Source: Malaysian CPG Type 2 Diabetes 2020, 2020)\n\n**3. Classification** \nNot specified in retrieved guidelines. (Source: Malaysian CPG Type 2 Diabetes 2020, 2020)\n\n**4. Management – Non-Pharmacological** \nLifestyle modification is emphasized at every stage of T2DM management. (Source: Malaysian C…"
+    },
+    {
+      "test_id": "HTN-SPECIAL-01",
+      "question": "How should hypertension be managed in elderly patients above 80 years?",
+      "chunks_retrieved": 10,
+      "retrieval_precision": 1.0,
+      "keyword_recall": 1.0,
+      "missing_keywords": [],
+      "llm_relevance_score": 5,
+      "has_citations": true,
+      "is_structured": true,
+      "hallucination_flag": false,
+      "judge_reasoning": "The answer provides a well-structured and cited response to the question about managing hypertension in elderly patients above 80 years, following established guidelines.",
+      "generated_answer": "**1. Definition** \nThe definition of hypertension in the elderly (>65 years old) is the same as in the general adult population. Hypertension in the elderly is an increasingly important public health concern as our population ages. (Source: Malaysian CPG Hypertension 2013, 2013)\n\n**2. Diagnostic Criteria** \nBP measurement in the elderly should include assessment for postural hypotension. Recommendations for BP measurements in the elderly patients are similar to those for the general population. …"
+    },
+    {
+      "test_id": "HTN-SPECIAL-02",
+      "question": "What is resistant hypertension and how is it managed?",
+      "chunks_retrieved": 10,
+      "retrieval_precision": 1.0,
+      "keyword_recall": 0.8,
+      "missing_keywords": [
+        "compliance"
+      ],
+      "llm_relevance_score": 5,
+      "has_citations": true,
+      "is_structured": true,
+      "hallucination_flag": false,
+      "judge_reasoning": "The answer provides a clear, structured, and well-cited explanation of resistant hypertension and its management, following established guidelines.",
+      "generated_answer": "**1. Definition**\nResistant hypertension is defined as uncontrolled hypertension (>140/90 mmHg) with good medication adherence in spite of the concurrent use of three anti-hypertensive agents (including a diuretic) in adequate doses. (Source: Malaysian CPG Hypertension 2013)\n\n**2. Diagnostic Criteria**\nBefore labeling a patient as having resistant hypertension, it is important that the practitioner ascertain that the patient adheres to medication, the blood pressure is measured appropriately, th…"
+    }
+  ]
+}

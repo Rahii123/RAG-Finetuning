@@ -124,6 +124,15 @@ BOILERPLATE_KEYWORDS = [
 def is_boilerplate(text: str) -> bool:
     """Return True if this chunk is administrative / boilerplate (not clinical)."""
     lower = text.lower()
+    # Filter out table of contents, index, section headers, empty formatting
+    if len(lower.strip()) < 100:
+        return True
+    if any(kw in lower for kw in ["table of contents", "index", "foreword", "appendix", "references", "glossary"]):
+        return True
+    # If chunk is mostly formatting or headers (e.g., >60% lines are short)
+    lines = [l.strip() for l in text.splitlines() if l.strip()]
+    if lines and sum(len(l) < 30 for l in lines) / len(lines) > 0.6:
+        return True
     return sum(1 for kw in BOILERPLATE_KEYWORDS if kw in lower) >= 2
 
 def split_into_sections(content: str) -> list[tuple[str, str]]:
@@ -150,9 +159,31 @@ def split_into_sections(content: str) -> list[tuple[str, str]]:
 # 4. TEXT SPLITTER  (800 char ≈ 200 tokens, overlap 100)
 # =====================================================
 
-text_splitter = RecursiveCharacterTextSplitter(
-    chunk_size=800,
-    chunk_overlap=100,
+# Improved chunking: larger size, more overlap, avoid splitting lists/tables
+class CustomTextSplitter(RecursiveCharacterTextSplitter):
+    def split_text(self, text):
+        # Avoid splitting inside bullet lists or tables
+        # If a chunk ends in a bullet, extend to next non-bullet line
+        chunks = super().split_text(text)
+        merged_chunks = []
+        buffer = ""
+        for chunk in chunks:
+            lines = chunk.splitlines()
+            if lines and (lines[-1].strip().startswith(('-','*','•','·')) or lines[-1].strip().startswith('|')):
+                buffer += chunk + "\n"
+                continue
+            if buffer:
+                merged_chunks.append(buffer + chunk)
+                buffer = ""
+            else:
+                merged_chunks.append(chunk)
+        if buffer:
+            merged_chunks.append(buffer)
+        return merged_chunks
+
+text_splitter = CustomTextSplitter(
+    chunk_size=1000,  # increased chunk size
+    chunk_overlap=180,  # increased overlap
     separators=["\n\n", "\n", ". ", " "],
 )
 

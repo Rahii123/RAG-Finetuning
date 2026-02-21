@@ -1,274 +1,258 @@
-"""
-rag_pipeline.py  –  Production-Grade Medical RAG
-==================================================
-Upgrades over v1:
-  ✅ Stronger embedding model: BAAI/bge-base-en-v1.5
-  ✅ Rich metadata in context rendering (guideline_name, section_type, year)
-  ✅ Professional structured medical prompt template
-  ✅ Per-source attribution in the final answer
-  ✅ Similarity score displayed + confidence signal
-  ✅ Distance filtering: ignores chunks below relevance threshold
-  ✅ Graceful error handling with retry logic
-"""
-
 import os
-import json
-import requests
+import re
+from typing import List
 from dotenv import load_dotenv
-from sentence_transformers import SentenceTransformer
-import chromadb
+load_dotenv()
 
-# ===============================
-# Load .env
-# ===============================
-ENV_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".env"))
-load_dotenv(dotenv_path=ENV_PATH, override=True)
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+from langchain_chroma import Chroma
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_groq import ChatGroq
+from langchain_core.documents import Document
+from langchain_core.prompts import ChatPromptTemplate
 
-if not GROQ_API_KEY:
-    raise ValueError("GROQ_API_KEY not found. Check your .env file.")
+# ==============================
+# CONFIG
+# ==============================
 
-# ===============================
-# Configuration
-# ===============================
-CHROMA_HOST      = "localhost"
-CHROMA_PORT      = 8000
-COLLECTION_NAME  = "clinical_guidelines"
-TOP_K            = 10         # ↑ was 7 — more context → better keyword recall
-MIN_RELEVANCE    = 0.30       # cosine similarity threshold (0 = identical, 2 = opposite)
-GROQ_MODEL       = "llama-3.3-70b-versatile"
-GROQ_API_URL     = "https://api.groq.com/openai/v1/chat/completions"
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+PERSIST_DIRECTORY = os.path.join(BASE_DIR, ".vector_store")
 
-# 🔹 Upgraded embedding model: BAAI/bge-base-en-v1.5 is measurably better
-# than all-MiniLM-L6-v2 for domain-specific retrieval.
-# NOTE: If ChromaDB was indexed with the OLD model, you must re-index first.
-#       To re-use the old index, change this back to "all-MiniLM-L6-v2"
-EMBEDDING_MODEL  = "BAAI/bge-base-en-v1.5"
+EMBEDDING_MODEL = "BAAI/bge-base-en-v1.5"
+GROQ_MODEL = "llama-3.3-70b-versatile"
 
-# ===============================
-# Initialize Clients
-# ===============================
-print("🔄 Loading embedding model…")
-embedding_model = SentenceTransformer(EMBEDDING_MODEL)
-
-client     = chromadb.HttpClient(host=CHROMA_HOST, port=CHROMA_PORT)
-collection = client.get_collection(name=COLLECTION_NAME)
-print(f"✅ Connected to ChromaDB  |  Collection: {COLLECTION_NAME}  |  Docs: {collection.count()}")
-
-# ===============================
-# Prompt Builder  (Structured Medical Prompt)
-# ===============================
-
-def build_medical_system_prompt() -> str:
-    return """You are an expert clinical guideline assistant trained on peer-reviewed medical guidelines.
-
-=== MANDATORY RULES (non-negotiable) ===
-1. Use ONLY the guideline extracts provided by the user. Do NOT use prior knowledge.
-2. EVERY section you write MUST end with a citation: (Source: <guideline_name>, <year>)
-   - If a section has no supporting extract, write: "Not specified in retrieved guidelines."
-3. Never invent drug names, dosages, thresholds, or classification criteria.
-4. You MUST produce ALL 7 sections listed below — do not skip any section.
-5. If information for a section is absent, still include the section heading and write "Not specified in retrieved guidelines."
-
-=== MANDATORY OUTPUT FORMAT ===
-You MUST follow this exact structure. Do not deviate:
-
-**1. Definition**
-[Write definition here] (Source: <guideline_name>, <year>)
-
-**2. Diagnostic Criteria**
-[Write diagnostic thresholds and tests here] (Source: <guideline_name>, <year>)
-
-**3. Classification**
-[Write severity/staging classification here] (Source: <guideline_name>, <year>)
-
-**4. Management – Non-Pharmacological**
-[Write lifestyle/diet/exercise interventions here] (Source: <guideline_name>, <year>)
-
-**5. Management – Pharmacological**
-[Write first-line drugs, combinations, dosing principles here] (Source: <guideline_name>, <year>)
-
-**6. Special Populations**
-[Write guidance for elderly/pregnant/children/renal/diabetic patients here] (Source: <guideline_name>, <year>)
-
-**7. Target Outcomes & Follow-up**
-[Write target values, monitoring intervals, referral thresholds here] (Source: <guideline_name>, <year>)
-
----
-REMINDER: Citation after EVERY section is mandatory. No exceptions."""
+TOP_K = 8
+MMR_FETCH_K = 30
+MMR_LAMBDA = 0.5
 
 
-def build_user_prompt(query: str, context_blocks: list[dict]) -> str:
-    context_str = ""
-    for i, block in enumerate(context_blocks):
-        meta = block["metadata"]
-        similarity = block.get("similarity", "N/A")
-        context_str += (
-            f"\n[Extract {i+1}] "
-            f"Guideline: {meta.get('guideline_name', 'Unknown')} | "
-            f"Year: {meta.get('year', '?')} | "
-            f"Section: {meta.get('section_header', '?')} | "
-            f"Relevance: {similarity:.2f}\n"
-            f"{block['text']}\n"
-            + "-" * 60 + "\n"
-        )
+# ==============================
+# EMBEDDINGS
+# ==============================
 
-    # Build citation hint: list all unique guideline names the LLM can cite from
-    unique_sources = list({
-        f"{b['metadata'].get('guideline_name', 'Unknown')} ({b['metadata'].get('year', '?')})"
-        for b in context_blocks
-    })
-    sources_hint = "\n".join(f"  - {s}" for s in unique_sources)
-
-    return f"""Clinical Question:
-{query}
-
-Available Guidelines (you MUST cite from these):
-{sources_hint}
-
-Guideline Extracts:
-{context_str}
-
-⚠️ REMINDER: Your response MUST include ALL 7 sections and EVERY section MUST have a (Source: ...) citation.
-"""
-
-# ===============================
-# Retrieval with Similarity Scoring
-# ===============================
-
-def retrieve(query: str) -> list[dict]:
-    """
-    Embed query, search ChromaDB, filter by MIN_RELEVANCE,
-    return enriched chunk dicts sorted by relevance.
-    """
-    # BGE models work best with this query prefix for retrieval tasks
-    prefixed_query = f"Represent this sentence for searching relevant passages: {query}"
-    query_embedding = embedding_model.encode(prefixed_query).tolist()
-
-    results = collection.query(
-        query_embeddings=[query_embedding],
-        n_results=TOP_K,
-        include=["documents", "metadatas", "distances"],
+def init_embeddings():
+    return HuggingFaceEmbeddings(
+        model_name=EMBEDDING_MODEL,
+        model_kwargs={"device": "cpu"},
+        encode_kwargs={"normalize_embeddings": True}
     )
 
-    documents = results["documents"][0]
-    metadatas = results["metadatas"][0]
-    distances = results["distances"][0]  # ChromaDB returns L2 distances
 
-    enriched = []
-    for doc, meta, dist in zip(documents, metadatas, distances):
-        # Convert L2 distance → approximate cosine-style score (lower = more relevant)
-        # Chroma default is L2; dist ≈ 0 means identical
-        similarity_score = 1 / (1 + dist)   # maps 0→∞ into 1→0
+# ==============================
+# LOAD VECTOR DB
+# ==============================
 
-        if similarity_score < MIN_RELEVANCE:
-            continue  # Filter irrelevant chunks
+def load_vector_db():
+    embeddings = init_embeddings()
 
-        enriched.append({
-            "text":       doc,
-            "metadata":   meta,
-            "distance":   dist,
-            "similarity": similarity_score,
-        })
+    vectordb = Chroma(
+        persist_directory=PERSIST_DIRECTORY,
+        embedding_function=embeddings,
+        collection_name="clinical_guidelines"
+    )
 
-    # Sort: most relevant first
-    enriched.sort(key=lambda x: x["similarity"], reverse=True)
-    return enriched
+    count = vectordb._collection.count()
+    print(f"\n📊 Collection: clinical_guidelines | Chunks: {count}")
 
-# ===============================
-# Groq API Call
-# ===============================
+    if count == 0:
+        print("❌ Vector store empty. Run chroma_store.py")
+        return None
 
-def call_groq(system_prompt: str, user_prompt: str, temperature: float = 0.1) -> str:
-    headers = {
-        "Authorization": f"Bearer {GROQ_API_KEY}",
-        "Content-Type": "application/json",
-    }
-    payload = {
-        "model": GROQ_MODEL,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user",   "content": user_prompt},
-        ],
-        "temperature": temperature,
-        "max_tokens": 2048,
-    }
+    return vectordb
 
-    response = requests.post(GROQ_API_URL, headers=headers, data=json.dumps(payload), timeout=30)
 
-    if response.status_code != 200:
-        raise RuntimeError(f"Groq API error {response.status_code}: {response.text}")
+# ==============================
+# RETRIEVAL (Transparent)
+# ==============================
 
-    return response.json()["choices"][0]["message"]["content"]
+def retrieve_documents(query: str, vectordb) -> List[Document]:
+    print("\n📚 Searching with MMR...")
 
-# ===============================
-# Display Helpers
-# ===============================
+    # Step 1 — Get diverse documents (MMR)
+    mmr_docs = vectordb.max_marginal_relevance_search(
+        query,
+        k=TOP_K,
+        fetch_k=MMR_FETCH_K,
+        lambda_mult=MMR_LAMBDA
+    )
 
-def display_sources(chunks: list[dict]) -> None:
-    print("\n📚 Retrieved Sources:")
-    print("─" * 60)
-    for i, chunk in enumerate(chunks):
-        meta = chunk["metadata"]
-        print(
-            f"  [{i+1}] {meta.get('guideline_name', '?')}  "
-            f"({meta.get('year', '?')})  |  "
-            f"Section: {meta.get('section_header', '?')}  |  "
-            f"Relevance: {chunk['similarity']:.3f}"
+    # Step 2 — Get similarity scores separately
+    scored_docs = vectordb.similarity_search_with_score(query, k=TOP_K)
+
+    # Create score lookup
+    score_lookup = {}
+    for doc, score in scored_docs:
+        score_lookup[doc.page_content[:200]] = score
+
+    print("\n🔎 Retrieval Transparency Report")
+    print("-" * 60)
+
+    final_docs = []
+    seen = set()
+
+    for i, doc in enumerate(mmr_docs, 1):
+        key = doc.page_content[:200]
+
+        if key in seen:
+            continue
+        seen.add(key)
+
+        score = score_lookup.get(key, "N/A")
+        source = doc.metadata.get("source", "Unknown")
+
+        print(f"[{i}] Score: {score} | Source: {source}")
+        print(f"     Preview: {doc.page_content[:120]}...\n")
+
+        final_docs.append(doc)
+
+    print("-" * 60)
+
+    return final_docs
+
+
+# ==============================
+# PROMPT WITH STRICT CITATION
+# ==============================
+
+def get_prompt():
+    template = """
+You are a clinical AI assistant.
+
+Strict Rules:
+1. Use ONLY the provided sources.
+2. After EVERY factual claim, cite like this: [Source X]
+3. If information is missing, write: Not in guidelines.
+4. Do NOT invent information.
+
+Context:
+{context}
+
+Question:
+{question}
+
+Answer Format:
+
+**Definition**:
+...
+
+**Criteria**:
+...
+
+**Management**:
+...
+"""
+    return ChatPromptTemplate.from_template(template)
+
+
+# ==============================
+# GENERATE ANSWER
+# ==============================
+
+def generate_answer(question: str, context: str):
+    llm = ChatGroq(
+        temperature=0.1,
+        model=GROQ_MODEL
+    )
+
+    prompt = get_prompt()
+    chain = prompt | llm
+    response = chain.invoke({
+        "context": context,
+        "question": question
+    })
+
+    return response.content
+
+
+# ==============================
+# REGEX VALIDATION LAYER
+# ==============================
+
+REQUIRED_SECTIONS = [
+    r"\*\*Definition\*\*",
+    r"\*\*Criteria\*\*",
+    r"\*\*Management\*\*"
+]
+
+CITATION_PATTERN = r"\[Source\s+\d+\]"
+
+def validate_answer(answer: str):
+    print("\n📋 Validation Report")
+    print("-" * 40)
+
+    # Check structure
+    missing_sections = []
+    for pattern in REQUIRED_SECTIONS:
+        if not re.search(pattern, answer):
+            missing_sections.append(pattern)
+
+    if missing_sections:
+        print("⚠ Missing Sections:", missing_sections)
+    else:
+        print("✅ All required sections present")
+
+    # Check citations
+    citations = re.findall(CITATION_PATTERN, answer)
+
+    if len(citations) == 0:
+        print("⚠ No citations detected")
+    else:
+        print(f"✅ Citations detected: {len(citations)}")
+
+    print("-" * 40)
+def build_context(docs: List[Document]) -> str:
+    parts = []
+
+    for i, doc in enumerate(docs, 1):
+        source = doc.metadata.get("source", f"Source-{i}")
+        content = doc.page_content.strip()
+
+        # Safety truncation (avoid token explosion)
+        if len(content) > 1200:
+            content = content[:1200] + "\n...[truncated]"
+
+        parts.append(
+            f"[Source {i}: {source}]\n"
+            f"{content}\n"
+            f"{'─'*70}"
         )
-    print("─" * 60)
 
-# ===============================
-# Main Interactive Loop
-# ===============================
+    return "\n\n".join(parts)
 
-SYSTEM_PROMPT = build_medical_system_prompt()
 
-print("\n" + "=" * 60)
-print("  🏥  Clinical Guideline RAG Assistant")
-print(f"  Model : {GROQ_MODEL}")
-print(f"  Embed : {EMBEDDING_MODEL}")
-print("=" * 60)
+# ==============================
+# MAIN LOOP
+# ==============================
 
-while True:
-    try:
-        query = input("\n🩺 Enter your clinical question (or 'exit'): ").strip()
-    except (EOFError, KeyboardInterrupt):
-        print("\nExiting…")
-        break
+def main():
+    vectordb = load_vector_db()
+    if not vectordb:
+        return
 
-    if query.lower() in ("exit", "quit", "q"):
-        print("Goodbye!")
-        break
+    print(f"\n🩺 Clinical RAG Ready | {GROQ_MODEL}\n")
 
-    if not query:
-        continue
+    while True:
+        query = input("🩺 Query (or 'exit'): ").strip()
 
-    # --- Retrieval ---
-    chunks = retrieve(query)
+        if query.lower() == "exit":
+            break
 
-    if not chunks:
-        print("\n⚠️  No sufficiently relevant documents found in the knowledge base.")
-        print("   Try rephrasing your question or checking if the topic is covered.")
-        continue
+        docs = retrieve_documents(query, vectordb)
 
-    display_sources(chunks)
+        if not docs:
+            print("❌ No relevant documents found.")
+            continue
 
-    # --- Prompting ---
-    user_prompt = build_user_prompt(query, chunks)
+        context = build_context(docs)
+        answer = generate_answer(query, context)
 
-    # --- Generation ---
-    print("\n⏳ Generating structured answer…\n")
-    try:
-        answer = call_groq(SYSTEM_PROMPT, user_prompt)
-    except RuntimeError as e:
-        print(f"❌ {e}")
-        continue
+        print("\n" + "=" * 70)
+        print("📋 CLINICAL ANSWER")
+        print("=" * 70)
+        print(answer)
+        print("=" * 70)
 
-    # --- Output ---
-    print("═" * 60)
-    print("  📋  CLINICAL GUIDELINE ANSWER")
-    print("═" * 60)
-    print(answer)
-    print("═" * 60)
-    print(f"\n⚙️  [Retrieved {len(chunks)} relevant chunks | Model: {GROQ_MODEL}]")
+        validate_answer(answer)
+
+
+if __name__ == "__main__":
+    main()
